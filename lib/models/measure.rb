@@ -2,7 +2,7 @@ class Measure
   include Mongoid::Document
   include Mongoid::Timestamps
   include Mongoid::Attributes::Dynamic
-  
+
   DEFAULT_EFFECTIVE_DATE = Time.gm(2012,12,31,23,59).to_i
   MP_START_DATE = Time.gm(2012,1,1,0,0).to_i
   TYPES = ["ep", "eh"]
@@ -41,6 +41,7 @@ class Measure
   field :preconditions, type: Hash
 
   field :value_set_oids, type: Array, default: []
+  field :oid_to_version, type: Hash, default: []
 
   field :map_fns, type: Array, default: []
 
@@ -50,7 +51,45 @@ class Measure
   #make sure that the use has a bundle associated with them
   before_save :set_continuous_variable
 
-  # Cache the generated JS code, with optional options to manipulate cached result                                                            
+  belongs_to :user
+  belongs_to :bundle, class_name: "HealthDataStandards::CQM::Bundle"
+  has_and_belongs_to_many :records, :inverse_of => nil
+
+  scope :by_measure_id, ->(id) { where({'measure_id'=>id }) }
+  scope :by_user, ->(user) { where({'user_id'=>user.id}) }
+  scope :by_type, ->(type) { where({'type'=>type}) }
+
+
+  def sanitize_oid_to_version
+    sanatized_hash = Hash.new
+    self.oid_to_version.each do |key, value|
+      san_key = key.gsub(".", "_")
+      sanatized_hash[san_key] = value
+    end
+    return sanatized_hash
+  end
+
+  def desanitize_oid_to_version
+    desanatized_hash = Hash.new
+    self.oid_to_version.each do |key, value|
+      desan_key = key.gsub("_", ".")
+      desanatized_hash[desan_key] = value
+    end
+    return desanatized_hash
+  end
+
+  def get_versioned_oid_search_array(target)
+    if (target == nil)
+      target = Array.new
+    end
+    self.value_set_oids.each do |oid|
+      sanatized_oid = oid.gsub(".", "_")
+      oid_version = oid + ":::" + self.oid_to_version[sanatized_oid]
+      target.push(oid_version)
+    end
+    return target
+  end
+  # Cache the generated JS code, with optional options to manipulate cached result
   def map_fn(population_index, options = {})
     options.assert_valid_keys :clear_db_cache, :cache_result_in_db, :check_crosswalk
     # Defaults are: don't clear the cache, do cache the result in the DB, use user specified crosswalk setting
@@ -72,13 +111,6 @@ class Measure
     self.save
   end
 
-  belongs_to :user
-  belongs_to :bundle, class_name: "HealthDataStandards::CQM::Bundle"
-  has_and_belongs_to_many :records, :inverse_of => nil
-
-  scope :by_measure_id, ->(id) { where({'measure_id'=>id }) }
-  scope :by_user, ->(user) { where({'user_id'=>user.id}) }
-  scope :by_type, ->(type) { where({'type'=>type}) }
 
   index "user_id" => 1
   # Find the measures matching a patient
@@ -120,10 +152,8 @@ class Measure
   end
 
   def value_sets
-    options = { oid: value_set_oids }
-    options[:user_id] = user.id if user?
-    @value_sets ||= HealthDataStandards::SVS::ValueSet.in(options)
-    @value_sets
+    search_oids = get_versioned_oid_search_array
+    @value_sets ||= HealthDataStandards::SVS::ValueSet.in(:versioned_oid => search_oids)
   end
 
   def all_data_criteria
@@ -259,7 +289,7 @@ class Measure
           episode_of_care: self.episode_of_care,
           hqmf_document:  self.as_hqmf_model.to_json
         }
-        
+
         if (self.populations.count > 1)
           sub_ids = ('a'..'az').to_a
           json[:sub_id] = sub_ids[population_index]
@@ -272,9 +302,10 @@ class Measure
           observation = self.population_criteria[self.populations[population_index][HQMF::PopulationCriteria::OBSERV]]
           json[:aggregator] = observation['aggregator']
         end
-        
+
         json[:oids] = self.value_sets.map{|value_set| value_set.oid}.uniq
-        
+        json[:oid_version] = self.desanitize_oid_to_version
+
         population_ids = {}
         HQMF::PopulationCriteria::ALL_POPULATION_CODES.each do |type|
           population_key = self.populations[population_index][type]
@@ -285,7 +316,7 @@ class Measure
         end
         stratification = self['populations'][population_index]['stratification']
         if stratification
-          population_ids['stratification'] = stratification 
+          population_ids['stratification'] = stratification
         end
         json[:population_ids] = population_ids
         json

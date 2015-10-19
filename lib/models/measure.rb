@@ -41,7 +41,7 @@ class Measure
   field :preconditions, type: Hash
 
   field :value_set_oids, type: Array, default: []
-  field :oid_to_version, type: Hash, default: []
+  field :oid_to_version, type: Array, default: []
 
   field :map_fns, type: Array, default: []
 
@@ -59,36 +59,6 @@ class Measure
   scope :by_user, ->(user) { where({'user_id'=>user.id}) }
   scope :by_type, ->(type) { where({'type'=>type}) }
 
-
-  def sanitize_oid_to_version
-    sanatized_hash = Hash.new
-    self.oid_to_version.each do |key, value|
-      san_key = key.gsub(".", "_")
-      sanatized_hash[san_key] = value
-    end
-    return sanatized_hash
-  end
-
-  def desanitize_oid_to_version
-    desanatized_hash = Hash.new
-    self.oid_to_version.each do |key, value|
-      desan_key = key.gsub("_", ".")
-      desanatized_hash[desan_key] = value
-    end
-    return desanatized_hash
-  end
-
-  def get_versioned_oid_search_array(target)
-    if (target == nil)
-      target = Array.new
-    end
-    self.value_set_oids.each do |oid|
-      sanatized_oid = oid.gsub(".", "_")
-      oid_version = oid + ":::" + self.oid_to_version[sanatized_oid]
-      target.push(oid_version)
-    end
-    return target
-  end
   # Cache the generated JS code, with optional options to manipulate cached result
   def map_fn(population_index, options = {})
     options.assert_valid_keys :clear_db_cache, :cache_result_in_db, :check_crosswalk
@@ -152,8 +122,7 @@ class Measure
   end
 
   def value_sets
-    search_oids = get_versioned_oid_search_array
-    @value_sets ||= HealthDataStandards::SVS::ValueSet.in(:versioned_oid => search_oids)
+    @value_sets ||= HealthDataStandards::SVS::ValueSet.in(:versioned_oid => oid_to_version)
   end
 
   def all_data_criteria
@@ -304,7 +273,7 @@ class Measure
         end
 
         json[:oids] = self.value_sets.map{|value_set| value_set.oid}.uniq
-        json[:oid_version] = self.desanitize_oid_to_version
+        json[:oid_version] = self.oid_to_version
 
         population_ids = {}
         HQMF::PopulationCriteria::ALL_POPULATION_CODES.each do |type|

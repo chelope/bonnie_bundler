@@ -123,6 +123,7 @@ class Measure
 
   def value_sets
     @value_sets ||= HealthDataStandards::SVS::ValueSet.in(:versioned_oid => oid_to_version)
+    @value_sets
   end
 
   def all_data_criteria

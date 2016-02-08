@@ -92,15 +92,13 @@ module Measures
         export_file "bundle.json", bundle_json.to_json
       end
 
-      # Export an in-memory zip file
       def export_zip
-        stringio = Zip::ZipOutputStream::write_buffer do |zip|
-          @zip = zip
-          export
+        zipfilename = base_dir + '/bundle_' + @user.email + '_export.zip'
+        if File.exist?(zipfilename)
+          File.delete(zipfilename)
         end
-        @zip = nil
-        stringio.rewind
-        stringio.sysread
+        export
+        zipfilename
       end
 
       def export_patients
@@ -258,11 +256,9 @@ module Measures
       end
 
       def export_file(file_name, data)
-        if @zip
-          @zip.put_next_entry file_name
-          @zip.puts data
-        else
-          write_to_file(file_name, data)
+        FileUtils::mkdir_p base_dir
+        Zip::ZipFile.open(base_dir + '/bundle_' + @user.email + '_export.zip', Zip::ZipFile::CREATE) do |zip|
+          zip.get_output_stream(file_name) { |f| f.puts data }
         end
       end
 

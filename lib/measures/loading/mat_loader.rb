@@ -48,10 +48,13 @@ module Measures
 
           Measures::ValueSetLoader.save_value_sets(value_set_models,user)
 
-          begin
+          # Try loading the HQMF first; fallback to SimpleXML only if the HQMF is not present, not if the HQMF fails
+          if hqmf_path
             model = Measures::Loader.parse_hqmf_model(hqmf_path)
-          rescue Exception => e
+          elsif simplexml_path
             model = Measures::Loader.parse_hqmf_model(simplexml_path)
+          else
+            raise MeasureLoadingException.new "No valid measure logic found"
           end
 
           model.backfill_patient_characteristics_with_codes(HQMF2JS::Generator::CodesToJson.from_value_sets(value_set_models))

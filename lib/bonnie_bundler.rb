@@ -11,10 +11,14 @@ require 'simplexml_parser'
 require 'active_support/core_ext/hash/indifferent_access'
 
 require_relative 'models/measure.rb'
+require_relative 'models/cql_measure.rb'
 require_relative 'measures/loading/bundle_loader.rb'
 require_relative 'measures/loading/exceptions.rb'
 require_relative 'measures/loading/loader.rb'
 require_relative 'measures/loading/mat_loader.rb'
+require_relative 'measures/loading/base_loader_definition.rb'
+require_relative 'measures/loading/hqmf_loader.rb'
+require_relative 'measures/loading/cql_loader.rb'
 require_relative 'measures/loading/sources_loader.rb'
 require_relative 'measures/loading/value_set_loader.rb'
 require_relative 'measures/exporter/bundle_exporter.rb'
@@ -32,7 +36,7 @@ module BonnieBundler
 end
 
 if defined?(Rails)
-  require_relative 'ext/railtie' 
+  require_relative 'ext/railtie'
 else
   BonnieBundler.logger = Log4r::Logger.new("Bonnie Bundler")
   BonnieBundler.logger.outputters = Log4r::Outputter.stdout

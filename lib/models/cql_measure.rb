@@ -25,6 +25,7 @@ class CqlMeasure
   # Store the derived ELM as a simple hash
   # TODO: some simple documentation on the formatting of ELM (or pointers to main doc)
   field :elm, type: Hash
+  field :elm_xml, type: String
 
   # TEMPORARY: store the XML for comparison
   field :xml, type: String

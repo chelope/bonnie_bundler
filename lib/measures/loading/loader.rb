@@ -65,12 +65,12 @@ module Measures
       measure
     end
 
-    def self.load_hqmf_cql_model_json(json, user, measure_oids, elm, cql)
+    def self.load_hqmf_cql_model_json(json, user, measure_oids, elm, elm_xml, cql)
       measure = CqlMeasure.new
       measure.user = user if user
       measure.cql = cql
       measure.elm = elm
-
+      measure.elm_xml = elm_xml
       # Add metadata
       measure.hqmf_id = json["hqmf_id"]
       measure.hqmf_set_id = json["hqmf_set_id"]

@@ -16,13 +16,12 @@ module Measures
       cql = nil
       hqmf_path = nil
       elm = ''
-
+      elm_xml = ''
+      
       # Grabs the cql file contents and the hqmf file path
       cql, hqmf_path = get_files_from_zip(file, out_dir)
-
       # Translate the cql to elm
-      elm = translate_cql_to_elm(cql)
-
+      elm, elm_xml = translate_cql_to_elm(cql)
       # Load hqmf into HQMF Parser
       model = Measures::Loader.parse_hqmf_model(hqmf_path)
 
@@ -32,13 +31,11 @@ module Measures
       rescue Exception => e
         raise VSACException.new "Error Loading Value Sets from VSAC: #{e.message}"
       end
-
       # Create CQL Measure
       model.backfill_patient_characteristics_with_codes(HQMF2JS::Generator::CodesToJson.from_value_sets(value_set_models))
       json = model.to_json
       json.convert_keys_to_strings
-      measure = Measures::Loader.load_hqmf_cql_model_json(json, user, value_set_models.collect{|vs| vs.oid}, JSON.parse(elm), cql)
-
+      measure = Measures::Loader.load_hqmf_cql_model_json(json, user, value_set_models.collect{|vs| vs.oid}, JSON.parse(elm), elm_xml, cql)
       puts "measure #{measure.cms_id || measure.measure_id} successfully loaded."
       measure
     end
@@ -65,9 +62,12 @@ module Measures
     def self.translate_cql_to_elm(cql)
       elm = ''
       begin
-        elm = RestClient.post('http://localhost:8080/cql/translator', cql, content_type: 'application/cql', accept: 'application/elm+json', timeout: 10)
+        elm_json = RestClient.post('http://localhost:8080/cql/translator', cql, content_type: 'application/cql', accept: 'application/elm+json', timeout: 10)
         elm.gsub! 'urn:oid:', '' # Removes 'urn:oid:' from ELM for Bonnie
-        return elm
+        elm_xml = RestClient.post('http://localhost:8080/cql/translator', cql, content_type: 'application/cql', accept: 'application/elm+xml', timeout: 10)
+        elm_xml = CQL_ELM::Parser.parse(elm_xml)
+        
+        return elm_json, elm_xml
       rescue RestClient::BadRequest => e
         raise MeasureLoadingException.new "Error Translating CQL to ELM: #{e.message}"
       end

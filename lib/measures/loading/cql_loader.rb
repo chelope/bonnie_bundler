@@ -65,8 +65,8 @@ module Measures
         elm_json = RestClient.post('http://localhost:8080/cql/translator', cql, content_type: 'application/cql', accept: 'application/elm+json', timeout: 10)
         elm.gsub! 'urn:oid:', '' # Removes 'urn:oid:' from ELM for Bonnie
         elm_xml = RestClient.post('http://localhost:8080/cql/translator', cql, content_type: 'application/cql', accept: 'application/elm+xml', timeout: 10)
-        elm_xml.gsub!(/\n/, '')
         elm_xml = CQL_ELM::Parser.parse(elm_xml)
+        elm_xml.gsub!(/\n/, '')
         return elm_json, elm_xml
       rescue RestClient::BadRequest => e
         raise MeasureLoadingException.new "Error Translating CQL to ELM: #{e.message}"
